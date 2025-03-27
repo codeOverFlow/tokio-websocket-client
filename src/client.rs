@@ -133,6 +133,10 @@ impl From<Client> for flume::Sender<Message> {
 }
 
 impl Client {
+    /// Send a text message to the server.
+    ///
+    /// # Errors
+    /// Returns an [`Error`](flume::SendError) if all receivers have been dropped.
     pub async fn text(&self, message: impl Into<String>) -> Result<(), flume::SendError<Message>> {
         let message = message.into();
         log::debug!("Sending text: {}", &message);
@@ -140,6 +144,12 @@ impl Client {
         self.to_send.send_async(Message::Text(message)).await
     }
 
+    /// Send a text message to the server.
+    ///
+    /// Allows to put a timeout on the queue sending the message.
+    ///
+    /// # Errors
+    /// Returns an [`Error`](flume::SendError) if all receivers have been dropped.
     pub async fn text_timeout(
         &self,
         message: impl Into<String>,
@@ -160,6 +170,10 @@ impl Client {
         }
     }
 
+    /// Send a binary message to the server.
+    ///
+    /// # Errors
+    /// Returns an [`Error`](flume::SendError) if all receivers have been dropped.
     pub async fn binary(
         &self,
         message: impl IntoIterator<Item = u8>,
@@ -170,6 +184,12 @@ impl Client {
         self.to_send.send_async(Message::Binary(message)).await
     }
 
+    /// Send a binary message to the server.
+    ///
+    /// Allows to put a timeout on the queue sending the message.
+    ///
+    /// # Errors
+    /// Returns an [`Error`](flume::SendError) if all receivers have been dropped.
     pub async fn binary_timeout(
         &self,
         message: impl IntoIterator<Item = u8>,

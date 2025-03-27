@@ -24,22 +24,18 @@ impl Handler for DummyHandler {
         Ok(())
     }
 
+    async fn on_close(&mut self, code: CloseCode, reason: &str) -> RetryStrategy {
+        log::info!("on_close received: {code:?}: {reason}");
+        RetryStrategy::Close
+    }
+
     async fn on_connect(&mut self) {
         log::info!("on_connect");
     }
 
-    async fn on_connect_failure(&mut self) -> Result<RetryStrategy, Self::Error> {
+    async fn on_connect_failure(&mut self) -> RetryStrategy {
         log::info!("on_connect_failure");
-        Ok(RetryStrategy::Close)
-    }
-
-    async fn on_close(
-        &mut self,
-        code: CloseCode,
-        reason: &str,
-    ) -> Result<RetryStrategy, Self::Error> {
-        log::info!("on_close received: {code:?}: {reason}");
-        Ok(RetryStrategy::Close)
+        RetryStrategy::Close
     }
 }
 

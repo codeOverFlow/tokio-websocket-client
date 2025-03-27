@@ -5,6 +5,7 @@ use std::{
     task::{Context, Poll},
 };
 
+#[doc(hidden)]
 pub struct StreamWrapper<'a, S, I, M, E>(pub(crate) S, pub(crate) PhantomData<&'a M>)
 where
     S: StreamExt<Item = Result<I, E>> + SinkExt<I> + Unpin + Send,

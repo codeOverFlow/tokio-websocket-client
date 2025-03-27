@@ -12,8 +12,10 @@ pub use crate::{
     connector::Connector,
     handler::{Handler, RetryStrategy},
     message::{CloseCode, Message},
-    stream_wrapper::StreamWrapper,
 };
+
+#[doc(hidden)]
+pub use crate::stream_wrapper::StreamWrapper;
 
 use futures::{Sink, SinkExt, StreamExt};
 
@@ -77,7 +79,7 @@ where
             Ok(stream) => stream,
             Err(reason) => {
                 log::error!("Failed to connect: {reason}");
-                if matches!(handler.on_connect_failure().await, Ok(RetryStrategy::Close)) {
+                if handler.on_connect_failure().await == RetryStrategy::Close {
                     log::error!("Stop retrying to connect.");
                     break Err(());
                 }
@@ -175,6 +177,7 @@ async fn background_task<C, H>(
                                 if reconnect(&mut stream, &mut connector, &mut handler).await.is_err() {
                                     break;
                                 }
+                                continue;
                             }
 
                             if buf[0] == last_ping {
@@ -189,13 +192,17 @@ async fn background_task<C, H>(
                         }
                         Message::Close(code, reason) => {
                             log::info!("Server closed with code {}: {reason}", u16::from(&code));
-                            if let Err(reason) = handler.on_close(code.clone(), &reason).await {
-                                log::error!("{reason}");
-                            }
-
-                            if reconnect(&mut stream, &mut connector, &mut handler).await.is_err() {
-                                log::error!("Stop retrying to connect.");
-                                break;
+                            match handler.on_close(code.clone(), &reason).await {
+                                RetryStrategy::Close => {
+                                    log::error!("Do not retry to connect.");
+                                    break;
+                                }
+                                RetryStrategy::Retry => {
+                                    if reconnect(&mut stream, &mut connector, &mut handler).await.is_err() {
+                                        log::error!("Stop retrying to connect.");
+                                        break;
+                                    }
+                                }
                             }
                         }
                     },

@@ -1,3 +1,4 @@
+#[allow(missing_docs)]
 pub enum Message {
     Text(String),
     Binary(Vec<u8>),
@@ -6,6 +7,7 @@ pub enum Message {
     Close(CloseCode, String),
 }
 
+#[allow(missing_docs)]
 #[derive(Debug, Clone)]
 pub enum CloseCode {
     /// Indicates a normal closure, meaning that the purpose for
