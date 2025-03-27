@@ -13,14 +13,16 @@
 ## Example
 This is a small example on how to use this crate using the `reqwest_websocket` backend.
 ```rust
-use futures::{Sink, SinkExt, Stream, StreamExt};
 use reqwest_websocket::RequestBuilderExt;
-use std::marker::PhantomData;
-use std::{
-    pin::{pin, Pin},
-    task::{Context, Poll},
+use tokio_websocket_client::{
+    CloseCode,
+    Connector,
+    Handler,
+    Message,
+    RetryStrategy,
+    StreamWrapper,
+    connect,
 };
-use tokio_websocket_client::{connect, CloseCode, Connector, Handler, Message, RetryStrategy, StreamWrapper};
 
 struct DummyHandler;
 
@@ -37,22 +39,18 @@ impl Handler for DummyHandler {
         Ok(())
     }
 
+    async fn on_close(&mut self, code: CloseCode, reason: &str) -> RetryStrategy {
+        log::info!("on_close received: {code:?}: {reason}");
+        RetryStrategy::Close
+    }
+
     async fn on_connect(&mut self) {
         log::info!("on_connect");
     }
 
-    async fn on_connect_failure(&mut self) -> Result<RetryStrategy, Self::Error> {
+    async fn on_connect_failure(&mut self) -> RetryStrategy {
         log::info!("on_connect_failure");
-        Ok(RetryStrategy::Close)
-    }
-
-    async fn on_close(
-        &mut self,
-        code: CloseCode,
-        reason: &str,
-    ) -> Result<RetryStrategy, Self::Error> {
-        log::info!("on_close received: {code:?}: {reason}");
-        Ok(RetryStrategy::Close)
+        RetryStrategy::Close
     }
 }
 
@@ -107,7 +105,10 @@ impl Connector for DummyConnector {
     type BackendMessage = reqwest_websocket::Message;
     type Error = reqwest_websocket::Error;
 
-    async fn connect() -> Result<StreamWrapper<'static, Self::BackendStream, Self::BackendMessage, Self::Item, Self::Error>, Self::Error> {
+    async fn connect() -> Result<
+        StreamWrapper<'static, Self::BackendStream, Self::BackendMessage, Self::Item, Self::Error>,
+        Self::Error,
+    > {
         // Creates a GET request, upgrades and sends it.
         let response = reqwest::Client::default()
             .get("wss://echo.websocket.org/")
