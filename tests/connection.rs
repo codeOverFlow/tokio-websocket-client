@@ -1,10 +1,13 @@
-use futures::{Sink, SinkExt, Stream, StreamExt};
 use reqwest_websocket::RequestBuilderExt;
-use std::{
-    pin::{Pin, pin},
-    task::{Context, Poll},
+use tokio_websocket_client::{
+    CloseCode,
+    Connector,
+    Handler,
+    Message,
+    RetryStrategy,
+    StreamWrapper,
+    connect,
 };
-use tokio_websocket_client::{CloseCode, Connector, Handler, Message, RetryStrategy, connect};
 
 struct DummyHandler;
 
@@ -48,6 +51,12 @@ impl From<reqwest_websocket::Message> for DummyMessage {
     }
 }
 
+impl From<DummyMessage> for reqwest_websocket::Message {
+    fn from(message: DummyMessage) -> Self {
+        message.0
+    }
+}
+
 impl From<DummyMessage> for Message {
     fn from(other: DummyMessage) -> Message {
         match other {
@@ -77,49 +86,18 @@ impl From<Message> for DummyMessage {
     }
 }
 
-struct DummyStream(reqwest_websocket::WebSocket);
-
-impl Stream for DummyStream {
-    type Item = Result<DummyMessage, reqwest_websocket::Error>;
-
-    fn poll_next(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Option<Self::Item>> {
-        match pin!(&mut self.0).poll_next(cx) {
-            Poll::Pending => Poll::Pending,
-            Poll::Ready(None) => Poll::Ready(None),
-            Poll::Ready(Some(Err(e))) => Poll::Ready(Some(Err(e))),
-            Poll::Ready(Some(Ok(msg))) => Poll::Ready(Some(Ok(msg.into()))),
-        }
-    }
-}
-
-impl Sink<DummyMessage> for DummyStream {
-    type Error = reqwest_websocket::Error;
-
-    fn poll_ready(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
-        pin!(&mut self.0).poll_ready(cx)
-    }
-
-    fn start_send(mut self: Pin<&mut Self>, item: DummyMessage) -> Result<(), Self::Error> {
-        pin!(&mut self.0).start_send(item.0)
-    }
-
-    fn poll_flush(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
-        pin!(&mut self.0).poll_flush(cx)
-    }
-
-    fn poll_close(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
-        pin!(&mut self.0).poll_close(cx)
-    }
-}
-
 struct DummyConnector;
 
 impl Connector for DummyConnector {
     type Item = DummyMessage;
-    type Stream = DummyStream;
+    type BackendStream = reqwest_websocket::WebSocket;
+    type BackendMessage = reqwest_websocket::Message;
     type Error = reqwest_websocket::Error;
 
-    async fn connect() -> Result<Self::Stream, Self::Error> {
+    async fn connect() -> Result<
+        StreamWrapper<'static, Self::BackendStream, Self::BackendMessage, Self::Item, Self::Error>,
+        Self::Error,
+    > {
         // Creates a GET request, upgrades and sends it.
         let response = reqwest::Client::default()
             .get("wss://echo.websocket.org/")
@@ -128,7 +106,7 @@ impl Connector for DummyConnector {
             .await?;
 
         // Turns the response into a DummyStream.
-        response.into_websocket().await.map(DummyStream)
+        response.into_websocket().await.map(StreamWrapper::from)
     }
 }
 

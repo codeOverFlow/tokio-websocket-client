@@ -5,12 +5,14 @@ mod client;
 mod connector;
 mod handler;
 mod message;
+mod stream_wrapper;
 
 pub use crate::{
     client::Client,
     connector::Connector,
     handler::{Handler, RetryStrategy},
     message::{CloseCode, Message},
+    stream_wrapper::StreamWrapper,
 };
 
 use futures::{Sink, SinkExt, StreamExt};
@@ -22,8 +24,8 @@ use futures::{Sink, SinkExt, StreamExt};
 pub async fn connect<C, H>(mut connector: C, mut handler: H) -> Option<Client>
 where
     C: Connector + 'static,
-    <C::Stream as Sink<C::Item>>::Error: std::error::Error + Send,
     H: Handler + 'static,
+    <C::BackendStream as Sink<C::BackendMessage>>::Error: std::error::Error + Send,
 {
     let (to_send_tx, to_send_rx) = flume::bounded(C::request_queue_size());
 
@@ -41,14 +43,14 @@ where
 }
 
 async fn reconnect<C, H>(
-    stream: &mut C::Stream,
+    stream: &mut StreamWrapper<'static, C::BackendStream, C::BackendMessage, C::Item, C::Error>,
     connector: &mut C,
     handler: &mut H,
 ) -> Result<(), ()>
 where
     C: Connector,
-    <C::Stream as Sink<C::Item>>::Error: std::error::Error,
     H: Handler,
+    <C::BackendStream as Sink<C::BackendMessage>>::Error: std::error::Error + Send,
 {
     if let Err(reason) = stream.close().await {
         log::error!("{reason}");
@@ -59,11 +61,16 @@ where
     Ok(())
 }
 
-async fn connect_stream<C, H>(connector: &mut C, handler: &mut H) -> Result<C::Stream, ()>
+async fn connect_stream<C, H>(
+    connector: &mut C,
+    handler: &mut H,
+) -> Result<StreamWrapper<'static, C::BackendStream, C::BackendMessage, C::Item, C::Error>, ()>
 where
     C: Connector,
-    <C::Stream as Sink<C::Item>>::Error: std::error::Error,
     H: Handler,
+    <StreamWrapper<'static, C::BackendStream, C::BackendMessage, C::Item, C::Error> as Sink<
+        C::Item,
+    >>::Error: std::error::Error,
 {
     loop {
         let stream = match C::connect().await {
@@ -91,13 +98,13 @@ where
 #[allow(clippy::too_many_lines, clippy::redundant_pub_crate)]
 async fn background_task<C, H>(
     to_send: flume::Receiver<Message>,
-    mut stream: C::Stream,
+    mut stream: StreamWrapper<'static, C::BackendStream, C::BackendMessage, C::Item, C::Error>,
     mut connector: C,
     mut handler: H,
 ) where
     C: Connector,
-    <C::Stream as Sink<C::Item>>::Error: std::error::Error,
     H: Handler,
+    <C::BackendStream as Sink<C::BackendMessage>>::Error: std::error::Error + Send,
 {
     let mut ping_interval = tokio::time::interval(C::ping_interval());
     let mut last_ping = 0u8;
