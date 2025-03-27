@@ -85,7 +85,7 @@ impl From<CloseCode> for u16 {
 }
 
 impl From<&CloseCode> for u16 {
-    fn from(code: &CloseCode) -> u16 {
+    fn from(code: &CloseCode) -> Self {
         match code {
             CloseCode::Normal => 1000,
             CloseCode::Away => 1001,
@@ -112,24 +112,24 @@ impl From<&CloseCode> for u16 {
 impl From<u16> for CloseCode {
     fn from(code: u16) -> Self {
         match code {
-            1000 => CloseCode::Normal,
-            1001 => CloseCode::Away,
-            1002 => CloseCode::Protocol,
-            1003 => CloseCode::Unsupported,
-            1005 => CloseCode::Status,
-            1006 => CloseCode::Abnormal,
-            1007 => CloseCode::Invalid,
-            1008 => CloseCode::Policy,
-            1009 => CloseCode::Size,
-            1010 => CloseCode::Extension,
-            1011 => CloseCode::Error,
-            1012 => CloseCode::Restart,
-            1013 => CloseCode::Again,
-            1015 => CloseCode::Tls,
-            1016..=2999 => CloseCode::Reserved(code),
-            3000..=3999 => CloseCode::Iana(code),
-            4000..=4999 => CloseCode::Private(code),
-            _ => CloseCode::Bad(code),
+            1000 => Self::Normal,
+            1001 => Self::Away,
+            1002 => Self::Protocol,
+            1003 => Self::Unsupported,
+            1005 => Self::Status,
+            1006 => Self::Abnormal,
+            1007 => Self::Invalid,
+            1008 => Self::Policy,
+            1009 => Self::Size,
+            1010 => Self::Extension,
+            1011 => Self::Error,
+            1012 => Self::Restart,
+            1013 => Self::Again,
+            1015 => Self::Tls,
+            1016..=2999 => Self::Reserved(code),
+            3000..=3999 => Self::Iana(code),
+            4000..=4999 => Self::Private(code),
+            _ => Self::Bad(code),
         }
     }
 }

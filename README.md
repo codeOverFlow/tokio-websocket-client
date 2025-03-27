@@ -61,9 +61,9 @@ impl From<reqwest_websocket::Message> for DummyMessage {
     }
 }
 
-impl Into<Message> for DummyMessage {
-    fn into(self) -> Message {
-        match self {
+impl From<DummyMessage> for Message {
+    fn from(other: DummyMessage) -> Message {
+        match other {
             DummyMessage(reqwest_websocket::Message::Text(data)) => Message::Text(data),
             DummyMessage(reqwest_websocket::Message::Binary(data)) => Message::Binary(data),
             DummyMessage(reqwest_websocket::Message::Ping(data)) => Message::Ping(data),

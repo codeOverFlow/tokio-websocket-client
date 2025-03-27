@@ -1,10 +1,10 @@
-use std::pin::{pin, Pin};
-use std::task::{Context, Poll};
-use std::time::Duration;
 use futures::{Sink, SinkExt, Stream, StreamExt};
-use reqwest_websocket;
 use reqwest_websocket::RequestBuilderExt;
-use tokio_websocket_client::{connect, CloseCode, Connector, Handler, Message, RetryStrategy};
+use std::{
+    pin::{Pin, pin},
+    task::{Context, Poll},
+};
+use tokio_websocket_client::{CloseCode, Connector, Handler, Message, RetryStrategy, connect};
 
 struct DummyHandler;
 
@@ -30,7 +30,11 @@ impl Handler for DummyHandler {
         Ok(RetryStrategy::Close)
     }
 
-    async fn on_close(&mut self, code: CloseCode, reason: &str) -> Result<RetryStrategy, Self::Error> {
+    async fn on_close(
+        &mut self,
+        code: CloseCode,
+        reason: &str,
+    ) -> Result<RetryStrategy, Self::Error> {
         log::info!("on_close received: {code:?}: {reason}");
         Ok(RetryStrategy::Close)
     }
@@ -44,14 +48,16 @@ impl From<reqwest_websocket::Message> for DummyMessage {
     }
 }
 
-impl Into<Message> for DummyMessage {
-    fn into(self) -> Message {
-        match self {
+impl From<DummyMessage> for Message {
+    fn from(other: DummyMessage) -> Message {
+        match other {
             DummyMessage(reqwest_websocket::Message::Text(data)) => Message::Text(data),
             DummyMessage(reqwest_websocket::Message::Binary(data)) => Message::Binary(data),
             DummyMessage(reqwest_websocket::Message::Ping(data)) => Message::Ping(data),
             DummyMessage(reqwest_websocket::Message::Pong(data)) => Message::Pong(data),
-            DummyMessage(reqwest_websocket::Message::Close {code, reason}) => Message::Close(CloseCode::from(u16::from(code)), reason),
+            DummyMessage(reqwest_websocket::Message::Close { code, reason }) => {
+                Message::Close(CloseCode::from(u16::from(code)), reason)
+            }
         }
     }
 }
@@ -63,7 +69,10 @@ impl From<Message> for DummyMessage {
             Message::Binary(data) => Self(reqwest_websocket::Message::Binary(data)),
             Message::Ping(data) => Self(reqwest_websocket::Message::Ping(data)),
             Message::Pong(data) => Self(reqwest_websocket::Message::Pong(data)),
-            Message::Close(code , reason) => Self(reqwest_websocket::Message::Close { code: reqwest_websocket::CloseCode::from(u16::from(code)), reason }),
+            Message::Close(code, reason) => Self(reqwest_websocket::Message::Close {
+                code: reqwest_websocket::CloseCode::from(u16::from(code)),
+                reason,
+            }),
         }
     }
 }
@@ -78,7 +87,7 @@ impl Stream for DummyStream {
             Poll::Pending => Poll::Pending,
             Poll::Ready(None) => Poll::Ready(None),
             Poll::Ready(Some(Err(e))) => Poll::Ready(Some(Err(e))),
-            Poll::Ready(Some(Ok(msg))) => {Poll::Ready(Some(Ok(msg.into())))}
+            Poll::Ready(Some(Ok(msg))) => Poll::Ready(Some(Ok(msg.into()))),
         }
     }
 }
@@ -132,6 +141,4 @@ async fn connection() {
     };
 
     client.text("hello world").await.unwrap();
-    drop(client);
-    tokio::time::sleep(Duration::from_secs(10)).await;
 }
