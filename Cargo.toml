@@ -2,11 +2,28 @@
 name = "tokio-websocket-client"
 version = "0.1.0"
 edition = "2024"
+authors = ["CodeOverFlow"]
+description = "A tokio based websocket client. It aims to ease dealing with websockets."
+keywords = ["Network", "websocket", "tokio", "async", "client"]
+categories = [
+  "network-programming",
+  "web-programming::websocket",
+  "asynchronous",
+]
+readme = "README.md"
+license = "MIT"
+homepage = "https://github.com/codeOverFlow/tokio-websocket-client"
+repository = "https://github.com/codeOverFlow/tokio-websocket-client"
 
 [dependencies]
 futures = "0.3.31"
 log = "0.4.27"
-tokio = { version = "1.44.1", features = ["time", "rt", "rt-multi-thread", "macros"] }
+tokio = { version = "1.44.1", features = [
+  "time",
+  "rt",
+  "rt-multi-thread",
+  "macros",
+] }
 flume = "0.11.1"
 
 [dev-dependencies]
