@@ -46,7 +46,15 @@ where
     };
 
     tokio::spawn(async move {
-        background_task(to_send_rx, command_rx, confirm_close_tx, stream, connector, handler).await;
+        background_task(
+            to_send_rx,
+            command_rx,
+            confirm_close_tx,
+            stream,
+            connector,
+            handler,
+        )
+        .await;
     });
 
     Some(Client {
@@ -272,11 +280,17 @@ where
                 }
 
                 log::info!("Server closed with code {}: {reason}", u16::from(&code));
-                
-                if let Err(reason) = stream.send(C::Item::from(Message::Close(code.clone(), String::default()))).await {
+
+                if let Err(reason) = stream
+                    .send(C::Item::from(Message::Close(
+                        code.clone(),
+                        String::default(),
+                    )))
+                    .await
+                {
                     log::error!("Failed to send back Close to stream: {reason}");
                 }
-                
+
                 match handler.on_close(code, &reason).await {
                     RetryStrategy::Close => {
                         log::error!("Do not retry to connect.");
@@ -393,6 +407,6 @@ async fn background_task<C, H>(
     if let Err(reason) = confirm_close_tx.send_async(()).await {
         log::error!("Failed to send closing confirmation: {reason}");
     }
-    
+
     log::trace!("Background task complete");
 }

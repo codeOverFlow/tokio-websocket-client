@@ -1,6 +1,6 @@
 use crate::{Message, command::Command};
-use std::time::Duration;
 use flume::RecvTimeoutError;
+use std::time::Duration;
 
 /// A connected client that can be used to send messages to the server.
 ///
@@ -254,8 +254,14 @@ impl Client {
     /// # Errors
     /// Return an [`Error`](flume::SendError) if the receiver is dropped.
     pub async fn close(&self) -> std::io::Result<()> {
-        self.command_tx.send_async(Command::Close).await.map_err(|err| std::io::Error::new(std::io::ErrorKind::BrokenPipe, err))?;
-        self.confirm_close_rx.recv_async().await.map_err(|err| std::io::Error::new(std::io::ErrorKind::BrokenPipe, err))
+        self.command_tx
+            .send_async(Command::Close)
+            .await
+            .map_err(|err| std::io::Error::new(std::io::ErrorKind::BrokenPipe, err))?;
+        self.confirm_close_rx
+            .recv_async()
+            .await
+            .map_err(|err| std::io::Error::new(std::io::ErrorKind::BrokenPipe, err))
     }
 
     /// Allow the [`Client`] to close the connection.
@@ -265,8 +271,12 @@ impl Client {
     /// # Errors
     /// Return an [`Error`](flume::SendError) if the receiver is dropped.
     pub fn blocking_close(self) -> std::io::Result<()> {
-        self.command_tx.send(Command::Close).map_err(|err| std::io::Error::new(std::io::ErrorKind::BrokenPipe, err))?;
-        self.confirm_close_rx.recv().map_err(|err| std::io::Error::new(std::io::ErrorKind::BrokenPipe, err))
+        self.command_tx
+            .send(Command::Close)
+            .map_err(|err| std::io::Error::new(std::io::ErrorKind::BrokenPipe, err))?;
+        self.confirm_close_rx
+            .recv()
+            .map_err(|err| std::io::Error::new(std::io::ErrorKind::BrokenPipe, err))
     }
 
     /// Allow the [`Client`] to close the connection.
@@ -280,18 +290,29 @@ impl Client {
         request_timeout: Duration,
         confirmation_timeout: Duration,
     ) -> std::io::Result<()> {
-        match self.command_tx.send_timeout(Command::Close, request_timeout) {
-            Ok(()) => {},
+        match self
+            .command_tx
+            .send_timeout(Command::Close, request_timeout)
+        {
+            Ok(()) => {}
             Err(reason) => {
                 return match &reason {
-                    flume::SendTimeoutError::Disconnected(_) => Err(std::io::Error::new(std::io::ErrorKind::BrokenPipe, reason)),
-                    flume::SendTimeoutError::Timeout(_) => Err(std::io::Error::new(std::io::ErrorKind::TimedOut, reason)),
-                }
-            },
+                    flume::SendTimeoutError::Disconnected(_) => {
+                        Err(std::io::Error::new(std::io::ErrorKind::BrokenPipe, reason))
+                    }
+                    flume::SendTimeoutError::Timeout(_) => {
+                        Err(std::io::Error::new(std::io::ErrorKind::TimedOut, reason))
+                    }
+                };
+            }
         }
-        self.confirm_close_rx.recv_timeout(confirmation_timeout).map_err(|err| match &err {
-            RecvTimeoutError::Disconnected => std::io::Error::new(std::io::ErrorKind::BrokenPipe, err),
-            RecvTimeoutError::Timeout => std::io::Error::new(std::io::ErrorKind::TimedOut, err),
-        })
+        self.confirm_close_rx
+            .recv_timeout(confirmation_timeout)
+            .map_err(|err| match &err {
+                RecvTimeoutError::Disconnected => {
+                    std::io::Error::new(std::io::ErrorKind::BrokenPipe, err)
+                }
+                RecvTimeoutError::Timeout => std::io::Error::new(std::io::ErrorKind::TimedOut, err),
+            })
     }
 }
