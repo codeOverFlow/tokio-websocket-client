@@ -133,5 +133,6 @@ async fn main() {
     };
 
     client.text("hello world").await.unwrap();
+    client.close().await.unwrap();
 }
 ```
