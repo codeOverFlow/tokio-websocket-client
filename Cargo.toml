@@ -1,6 +1,6 @@
 [package]
 name = "tokio-websocket-client"
-version = "0.1.0"
+version = "0.2.0"
 edition = "2024"
 authors = ["CodeOverFlow"]
 description = "A tokio based websocket client. It aims to ease dealing with websockets."

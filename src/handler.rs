@@ -13,18 +13,15 @@ pub enum RetryStrategy {
 ///
 /// It also allows to define [`RetryStrategy`] when connection fails and a callback on connection.
 pub trait Handler: Send {
-    /// The error type for every callback.
-    type Error: std::error::Error + Send;
-
     /// Handle text messages.
     ///
     /// Any error will trigger a reconnection.
-    fn on_text(&mut self, text: &str) -> impl Future<Output = Result<(), Self::Error>> + Send;
+    fn on_text(&mut self, text: &str) -> impl Future<Output = ()> + Send;
 
     /// Handle binary messages.
     ///
     /// Any error will trigger a reconnection.
-    fn on_binary(&mut self, buffer: &[u8]) -> impl Future<Output = Result<(), Self::Error>> + Send;
+    fn on_binary(&mut self, buffer: &[u8]) -> impl Future<Output = ()> + Send;
 
     /// Defines the behavior for when the server closes the connection.
     ///
@@ -47,6 +44,11 @@ pub trait Handler: Send {
     ///
     /// Return the [`RetryStrategy`] to use.
     fn on_connect_failure(&mut self) -> impl Future<Output = RetryStrategy> + Send {
+        async move { RetryStrategy::Retry }
+    }
+
+    /// Defines a callback for when connection is broken.
+    fn on_disconnect(&mut self) -> impl Future<Output = RetryStrategy> + Send {
         async move { RetryStrategy::Retry }
     }
 }

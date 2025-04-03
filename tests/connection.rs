@@ -12,16 +12,12 @@ use tokio_websocket_client::{
 struct DummyHandler;
 
 impl Handler for DummyHandler {
-    type Error = reqwest_websocket::Error;
-
-    async fn on_text(&mut self, text: &str) -> Result<(), Self::Error> {
+    async fn on_text(&mut self, text: &str) {
         log::info!("on_text received: {text}");
-        Ok(())
     }
 
-    async fn on_binary(&mut self, buffer: &[u8]) -> Result<(), Self::Error> {
+    async fn on_binary(&mut self, buffer: &[u8]) {
         log::info!("on_binary received: {buffer:?}");
-        Ok(())
     }
 
     async fn on_close(&mut self, code: CloseCode, reason: &str) -> RetryStrategy {
@@ -35,6 +31,11 @@ impl Handler for DummyHandler {
 
     async fn on_connect_failure(&mut self) -> RetryStrategy {
         log::info!("on_connect_failure");
+        RetryStrategy::Close
+    }
+
+    async fn on_disconnect(&mut self) -> RetryStrategy {
+        log::info!("on_disconnect");
         RetryStrategy::Close
     }
 }
@@ -96,7 +97,7 @@ impl Connector for DummyConnector {
     > {
         // Creates a GET request, upgrades and sends it.
         let response = reqwest::Client::default()
-            .get("wss://echo.websocket.org/")
+            .get("ws://echo.websocket.org/")
             .upgrade() // Prepares the WebSocket upgrade.
             .send()
             .await?;
@@ -108,11 +109,22 @@ impl Connector for DummyConnector {
 
 #[tokio::test]
 async fn connection() {
-    simple_logger::init_with_level(log::Level::Trace).unwrap();
+    // simple_logger::init_with_level(log::Level::Trace).unwrap();
     let Some(client) = connect(DummyConnector, DummyHandler).await else {
         log::info!("Failed to connect");
         return;
     };
 
     client.text("hello world").await.unwrap();
+}
+
+#[tokio::test]
+async fn close_connection() {
+    simple_logger::init_with_level(log::Level::Trace).unwrap();
+    let Some(client) = connect(DummyConnector, DummyHandler).await else {
+        log::info!("Failed to connect");
+        return;
+    };
+
+    client.close().await.unwrap();
 }
