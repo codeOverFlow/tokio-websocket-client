@@ -1,6 +1,9 @@
 use crate::{Message, command::Command};
-use flume::RecvTimeoutError;
-use std::time::Duration;
+use flume::{RecvTimeoutError, SendTimeoutError};
+use std::{
+    io::{Error as IoError, ErrorKind as IoErrorKind, Result as IoResult},
+    time::Duration,
+};
 
 /// A connected client that can be used to send messages to the server.
 ///
@@ -125,22 +128,36 @@ use std::time::Duration;
 /// ```
 #[derive(Debug, Clone)]
 pub struct Client {
-    pub(crate) to_send: flume::Sender<Message>,
-    pub(crate) command_tx: flume::Sender<Command>,
-    pub(crate) confirm_close_rx: flume::Receiver<()>,
+    to_send: flume::Sender<Message>,
+    command_tx: flume::Sender<Command>,
+    confirm_close_rx: flume::Receiver<()>,
 }
 
 impl From<Client> for flume::Sender<Message> {
+    #[inline]
     fn from(client: Client) -> Self {
         client.to_send
     }
 }
 
 impl Client {
+    pub(crate) fn new(
+        to_send: flume::Sender<Message>,
+        command_tx: flume::Sender<Command>,
+        confirm_close_rx: flume::Receiver<()>,
+    ) -> Self {
+        Self {
+            to_send,
+            command_tx,
+            confirm_close_rx,
+        }
+    }
+
     /// Send a text message to the server.
     ///
     /// # Errors
     /// Returns an [`Error`](flume::SendError) if all receivers have been dropped.
+    #[inline]
     pub async fn text(&self, message: impl Into<String>) -> Result<(), flume::SendError<Message>> {
         let message = message.into();
         log::debug!("Sending text: {message}");
@@ -152,6 +169,7 @@ impl Client {
     ///
     /// # Errors
     /// Returns an [`Error`](flume::SendError) if all receivers have been dropped.
+    #[inline]
     pub fn blocking_text(
         &self,
         message: impl Into<String>,
@@ -166,6 +184,7 @@ impl Client {
     ///
     /// # Errors
     /// Returns an [`Error`](flume::SendTimeoutError) if all receivers have been dropped or the timeout has been reached.
+    #[inline]
     pub fn blocking_text_timeout(
         &self,
         message: impl Into<String>,
@@ -181,6 +200,7 @@ impl Client {
     ///
     /// # Errors
     /// Returns an [`Error`](flume::SendError) if all receivers have been dropped.
+    #[inline]
     pub async fn binary(
         &self,
         message: impl IntoIterator<Item = u8>,
@@ -195,6 +215,7 @@ impl Client {
     ///
     /// # Errors
     /// Returns an [`Error`](flume::SendError) if all receivers have been dropped.
+    #[inline]
     pub fn blocking_binary(
         &self,
         message: impl IntoIterator<Item = u8>,
@@ -209,6 +230,7 @@ impl Client {
     ///
     /// # Errors
     /// Returns an [`Error`](flume::SendTimeoutError) if all receivers have been dropped or the timeout has been reached.
+    #[inline]
     pub fn blocking_binary_timeout(
         &self,
         message: impl IntoIterator<Item = u8>,
@@ -224,6 +246,7 @@ impl Client {
     ///
     /// # Errors
     /// Return an [`Error`](flume::SendError) if the receiver is dropped.
+    #[inline]
     pub async fn force_reconnect(&self) -> Result<(), flume::SendError<Command>> {
         self.command_tx.send_async(Command::Reconnect).await
     }
@@ -232,6 +255,7 @@ impl Client {
     ///
     /// # Errors
     /// Return an [`Error`](flume::SendError) if the receiver is dropped.
+    #[inline]
     pub fn blocking_force_reconnect(&self) -> Result<(), flume::SendError<Command>> {
         self.command_tx.send(Command::Reconnect)
     }
@@ -240,6 +264,7 @@ impl Client {
     ///
     /// # Errors
     /// Return an [`Error`](flume::SendTimeoutError) if the receiver is dropped.
+    #[inline]
     pub fn blocking_force_reconnect_timeout(
         &self,
         timeout: Duration,
@@ -253,15 +278,16 @@ impl Client {
     ///
     /// # Errors
     /// Return an [`Error`](flume::SendError) if the receiver is dropped.
-    pub async fn close(&self) -> std::io::Result<()> {
+    #[inline]
+    pub async fn close(&self) -> IoResult<()> {
         self.command_tx
             .send_async(Command::Close)
             .await
-            .map_err(|err| std::io::Error::new(std::io::ErrorKind::BrokenPipe, err))?;
+            .map_err(|err| IoError::new(IoErrorKind::BrokenPipe, err))?;
         self.confirm_close_rx
             .recv_async()
             .await
-            .map_err(|err| std::io::Error::new(std::io::ErrorKind::BrokenPipe, err))
+            .map_err(|err| IoError::new(IoErrorKind::BrokenPipe, err))
     }
 
     /// Allow the [`Client`] to close the connection.
@@ -270,13 +296,14 @@ impl Client {
     ///
     /// # Errors
     /// Return an [`Error`](flume::SendError) if the receiver is dropped.
-    pub fn blocking_close(self) -> std::io::Result<()> {
+    #[inline]
+    pub fn blocking_close(self) -> IoResult<()> {
         self.command_tx
             .send(Command::Close)
-            .map_err(|err| std::io::Error::new(std::io::ErrorKind::BrokenPipe, err))?;
+            .map_err(|err| IoError::new(IoErrorKind::BrokenPipe, err))?;
         self.confirm_close_rx
             .recv()
-            .map_err(|err| std::io::Error::new(std::io::ErrorKind::BrokenPipe, err))
+            .map_err(|err| IoError::new(IoErrorKind::BrokenPipe, err))
     }
 
     /// Allow the [`Client`] to close the connection.
@@ -285,34 +312,33 @@ impl Client {
     ///
     /// # Errors
     /// Return an [`Error`](flume::SendError) if the receiver is dropped.
+    #[inline]
     pub fn blocking_close_timeout(
         self,
         request_timeout: Duration,
         confirmation_timeout: Duration,
-    ) -> std::io::Result<()> {
+    ) -> IoResult<()> {
         match self
             .command_tx
             .send_timeout(Command::Close, request_timeout)
         {
             Ok(()) => {}
             Err(reason) => {
-                return match &reason {
-                    flume::SendTimeoutError::Disconnected(_) => {
-                        Err(std::io::Error::new(std::io::ErrorKind::BrokenPipe, reason))
+                return match reason {
+                    SendTimeoutError::Disconnected(_) => {
+                        Err(IoError::new(IoErrorKind::BrokenPipe, reason))
                     }
-                    flume::SendTimeoutError::Timeout(_) => {
-                        Err(std::io::Error::new(std::io::ErrorKind::TimedOut, reason))
+                    SendTimeoutError::Timeout(_) => {
+                        Err(IoError::new(IoErrorKind::TimedOut, reason))
                     }
                 };
             }
         }
         self.confirm_close_rx
             .recv_timeout(confirmation_timeout)
-            .map_err(|err| match &err {
-                RecvTimeoutError::Disconnected => {
-                    std::io::Error::new(std::io::ErrorKind::BrokenPipe, err)
-                }
-                RecvTimeoutError::Timeout => std::io::Error::new(std::io::ErrorKind::TimedOut, err),
+            .map_err(|err| match err {
+                RecvTimeoutError::Disconnected => IoError::new(IoErrorKind::BrokenPipe, err),
+                RecvTimeoutError::Timeout => IoError::new(IoErrorKind::TimedOut, err),
             })
     }
 }

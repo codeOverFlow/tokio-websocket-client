@@ -26,7 +26,11 @@ pub trait Handler: Send {
     /// Defines the behavior for when the server closes the connection.
     ///
     /// Return the [`RetryStrategy`] to use.
-    #[allow(unused_variables)]
+    #[inline]
+    #[expect(
+        unused_variables,
+        reason = "default implementation does not use parameters but prefixing with `_` would show in the documentation"
+    )]
     fn on_close(
         &mut self,
         code: CloseCode,
@@ -36,6 +40,7 @@ pub trait Handler: Send {
     }
 
     /// Defines a callback for when connection succeeds.
+    #[inline]
     fn on_connect(&mut self) -> impl Future<Output = ()> + Send {
         async move {}
     }
@@ -43,11 +48,13 @@ pub trait Handler: Send {
     /// Defines the behavior for when the connection fails.
     ///
     /// Return the [`RetryStrategy`] to use.
+    #[inline]
     fn on_connect_failure(&mut self) -> impl Future<Output = RetryStrategy> + Send {
         async move { RetryStrategy::Retry }
     }
 
     /// Defines a callback for when connection is broken.
+    #[inline]
     fn on_disconnect(&mut self) -> impl Future<Output = RetryStrategy> + Send {
         async move { RetryStrategy::Retry }
     }

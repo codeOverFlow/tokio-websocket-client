@@ -1,4 +1,4 @@
-#[allow(missing_docs)]
+#[expect(missing_docs, reason = "explicit enough")]
 pub enum Message {
     Text(String),
     Binary(Vec<u8>),
@@ -7,7 +7,7 @@ pub enum Message {
     Close(CloseCode, String),
 }
 
-#[allow(missing_docs)]
+#[expect(missing_docs, reason = "explicit enough")]
 #[derive(Debug, Clone)]
 pub enum CloseCode {
     /// Indicates a normal closure, meaning that the purpose for
@@ -81,14 +81,16 @@ pub enum CloseCode {
 }
 
 impl From<CloseCode> for u16 {
+    #[inline]
     fn from(code: CloseCode) -> Self {
         Self::from(&code)
     }
 }
 
 impl From<&CloseCode> for u16 {
+    #[inline]
     fn from(code: &CloseCode) -> Self {
-        match code {
+        match *code {
             CloseCode::Normal => 1000,
             CloseCode::Away => 1001,
             CloseCode::Protocol => 1002,
@@ -106,12 +108,13 @@ impl From<&CloseCode> for u16 {
             CloseCode::Reserved(code)
             | CloseCode::Private(code)
             | CloseCode::Iana(code)
-            | CloseCode::Bad(code) => *code,
+            | CloseCode::Bad(code) => code,
         }
     }
 }
 
 impl From<u16> for CloseCode {
+    #[inline]
     fn from(code: u16) -> Self {
         match code {
             1000 => Self::Normal,
